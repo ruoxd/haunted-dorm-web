@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>躺平发育 - 网页版</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  html, body {
+    height: 100%;
+    background: #0a0e1a;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: #e8e8e8;
+    overflow: hidden;
+  }
+  #wrap {
+    display: flex;
+    height: 100vh;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 14px;
+  }
+  #stage {
+    position: relative;
+    border: 2px solid #2a3358;
+    border-radius: 8px;
+    box-shadow: 0 0 30px rgba(80,120,255,0.15), inset 0 0 40px rgba(0,0,0,0.6);
+    background: #0d1326;
+  }
+  canvas { display: block; border-radius: 6px; }
+  #side {
+    width: 240px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 600px;
+  }
+  .panel {
+    background: linear-gradient(180deg, #161c34, #0f1428);
+    border: 1px solid #2a3358;
+    border-radius: 8px;
+    padding: 10px;
+  }
+  #stats { font-size: 13px; line-height: 1.9; }
+  .stat-row { display: flex; justify-content: space-between; }
+  .stat-row b { color: #ffd24a; }
+  #shop h3 {
+    font-size: 14px; color: #9db4ff; margin-bottom: 8px;
+    border-bottom: 1px solid #2a3358; padding-bottom: 6px;
+  }
+  .shop-btn {
+    width: 100%;
+    background: linear-gradient(180deg, #2a3a66, #1c2748);
+    border: 1px solid #3a4a78;
+    color: #e8e8e8;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    text-align: left;
+    transition: all .15s;
+  }
+  .shop-btn:hover:not(:disabled) {
+    background: linear-gradient(180deg, #3a4f86, #283462);
+    border-color: #5a70b8;
+  }
+  .shop-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .shop-btn .price { color: #ffd24a; float: right; }
+  .shop-btn .lv { color: #8aa0d8; font-size: 10px; }
+  .shop-btn.active {
+    border-color: #4affc8;
+    box-shadow: 0 0 10px rgba(74,255,200,0.4);
+    background: linear-gradient(180deg, #1c4a3e, #143028);
+  }
+  #tips {
+    font-size: 11px; color: #8a94b8; line-height: 1.6;
+  }
+  #tips kbd {
+    background: #2a3358; padding: 1px 5px; border-radius: 3px;
+    color: #ffd24a; font-size: 10px;
+  }
+  #overlay {
+    position: absolute; inset: 0;
+    background: rgba(5,8,18,0.92);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    border-radius: 6px;
+    text-align: center;
+  }
+  #overlay h1 {
+    font-size: 38px; color: #ffd24a;
+    text-shadow: 0 0 20px rgba(255,210,74,0.5);
+    margin-bottom: 8px;
+  }
+  #overlay h1 span { color: #ff5a7a; }
+  #overlay p { color: #9db4ff; margin: 6px 0; font-size: 14px; }
+  #overlay button {
+    margin-top: 20px;
+    padding: 12px 40px;
+    background: linear-gradient(180deg, #ffd24a, #e0a020);
+    border: none; color: #1a1a1a;
+    font-size: 18px; font-weight: bold;
+    border-radius: 6px; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(255,210,74,0.4);
+  }
+  #overlay button:hover { transform: translateY(-2px); }
+  .gameover #overlay h1 { color: #ff5a7a; text-shadow: 0 0 20px rgba(255,90,122,0.5); }
+  .hidden { display: none !important; }
+  #wave-announce {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 48px; font-weight: bold;
+    color: #ff5a7a;
+    text-shadow: 0 0 30px rgba(255,90,122,0.8);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .4s;
+    text-align: center;
+  }
+  #wave-announce.show { opacity: 1; }
+  #wave-announce small { display:block; font-size: 20px; color: #ffd24a; font-weight: normal; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="game" width="800" height="600"></canvas>
+    <div id="wave-announce"></div>
+    <div id="overlay">
+      <h1>躺平<span>发育</span></h1>
+      <p>白天升级床铺攒金币，夜晚建造炮台抵御怪物</p>
+      <p>别让怪物攻破你的门！</p>
+      <button id="startBtn">开始游戏</button>
+    </div>
+  </div>
+  <div id="side">
+    <div class="panel" id="stats">
+      <div class="stat-row"><span>金币</span><b id="gold">0</b></div>
+      <div class="stat-row"><span>波数</span><b id="wave">0</b></div>
+      <div class="stat-row"><span>玩家血量</span><b id="hp">100</b></div>
+      <div class="stat-row"><span>门血量</span><b id="doorHp">100</b></div>
+      <div class="stat-row"><span>时间</span><b id="phase">白天</b></div>
+    </div>
+    <div class="panel" id="shop">
+      <h3>商店（数字键快选）</h3>
+      <button class="shop-btn" data-action="bed">
+        升级床铺 <span class="price">25</span>
+        <div class="lv">当前 Lv.<span data-lv="bed">1</span> · 产出 <span data-rate="bed">2</span>/秒</div>
+      </button>
+      <button class="shop-btn" data-action="door">
+        加固门 <span class="price">30</span>
+        <div class="lv">门血量上限 <span data-rate="door">100</span></div>
+      </button>
+      <button class="shop-btn" data-action="repair">
+        修补门 <span class="price">15</span>
+        <div class="lv">恢复 50 点门血量</div>
+      </button>
+      <button class="shop-btn" data-action="turret">
+        建造炮台 <span class="price">40</span>
+        <div class="lv">点击墙壁位置放置 · 再按4取消</div>
+      </button>
+      <button class="shop-btn" data-action="turretUp">
+        升级炮台 <span class="price">30</span>
+        <div class="lv">点击已建炮台升级</div>
+      </button>
+    </div>
+    <div class="panel" id="tips">
+      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动玩家</div>
+      <div><kbd>1</kbd>~<kbd>5</kbd> 商店快选</div>
+      <div>鼠标点击放置/选择炮台</div>
+      <div>靠近床可加速金币产出</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const cvs = document.getElementById('game');
+  const ctx = cvs.getContext('2d');
+  const W = cvs.width, H = cvs.height;
+
+  // ===== 游戏状态 =====
+  let state = null;
+  const keys = {};
+
+  // 房间几何
+  const ROOM = {
+    x: 220, y: 180, w: 360, h: 280,
+    wall: 14,
+    doorW: 70
+  };
+  ROOM.cx = ROOM.x + ROOM.w/2;
+  ROOM.cy = ROOM.y + ROOM.h/2;
+  // 门在右侧墙中间
+  ROOM.doorY = ROOM.y + ROOM.h/2 - ROOM.doorW/2;
+
+  const BED = { x: ROOM.x + 70, y: ROOM.y + 90, w: 60, h: 80 };
+
+  function newState() {
+    return {
+      gold: 50,
+      wave: 0,
+      phase: 'day',          // day | night
+      phaseTime: 0,
+      dayDuration: 14,
+      nightDuration: 99999,  // 夜晚持续到怪物清空
+      player: {
+        x: ROOM.cx, y: ROOM.cy + 40,
+        r: 12, speed: 2.6, hp: 100, maxHp: 100,
+        atkCool: 0
+      },
+      bed: { lv: 1, rate: 2, accum: 0, upgradeCost: 25 },
+      door: { hp: 100, maxHp: 100, lv: 1, upgradeCost: 30, repairCost: 15 },
+      turrets: [],
+      monsters: [],
+      bullets: [],
+      particles: [],
+      shopSel: null,         // 'turret' 放置 / 'turretUp' 升级
+      over: false,
+      announceTimer: 0,
+      spawnQueue: 0,
+      spawnTimer: 0,
+    };
+  }
+
+  // ===== 商店配置 =====
+  const COST = {
+    bed: s => 25 + (s.bed.lv - 1) * 20,
+    door: s => 30 + (s.door.lv - 1) * 25,
+    repair: () => 15,
+    turret: () => 40,
+    turretUp: t => 30 + (t.lv - 1) * 20,
+  };
+
+  // ===== 输入 =====
+  window.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if (!state || state.over) return;
+    const map = { '1':'bed', '2':'door', '3':'repair', '4':'turret', '5':'turretUp' };
+    if (map[e.key]) tryShop(map[e.key]);
+  });
+  window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+  // ===== 商店交互 =====
+  document.querySelectorAll('.shop-btn').forEach(btn => {
+    btn.addEventListener('click', () => tryShop(btn.dataset.action));
+  });
+
+  function tryShop(action) {
+    if (!state || state.over) return;
+    if (action === 'bed') {
+      const c = COST.bed(state);
+      if (state.gold >= c) {
+        state.gold -= c;
+        state.bed.lv++;
+        state.bed.rate = 1 + state.bed.lv; // Lv1=2, Lv2=3...
+        state.bed.upgradeCost = COST.bed(state);
+        flash('床铺升级！');
+      }
+    } else if (action === 'door') {
+      const c = COST.door(state);
+      if (state.gold >= c) {
+        state.gold -= c;
+        state.door.lv++;
+        state.door.maxHp = 100 + (state.door.lv - 1) * 80;
+        state.door.hp = state.door.maxHp; // 加固后满血
+        state.door.upgradeCost = COST.door(state);
+        flash('门已加固！');
+      }
+    } else if (action === 'repair') {
+      const c = COST.repair();
+      if (state.gold >= c && state.door.hp < state.door.maxHp) {
+        state.gold -= c;
+        state.door.hp = Math.min(state.door.maxHp, state.door.hp + 50);
+        flash('修补完成！');
+      }
+    } else if (action === 'turret') {
+      // 切换放置模式
+      state.shopSel = state.shopSel === 'turret' ? null : 'turret';
+      if (state.shopSel !== 'turret') {}
+    } else if (action === 'turretUp') {
+      state.shopSel = state.shopSel === 'turretUp' ? null : 'turretUp';
+    }
+    updateShopUI();
+  }
+
+  // 浮动提示
+  function flash(msg) {
+    state.particles.push({
+      type:'text', text: msg, x: ROOM.cx, y: ROOM.y - 30,
+      vy: -0.6, life: 90, maxLife: 90, color: '#ffd24a'
+    });
+  }
+
+  // ===== 鼠标交互 =====
+  cvs.addEventListener('mousemove', e => {
+    if (!state) return;
+    const r = cvs.getBoundingClientRect();
+    state.mouse = {
+      x: (e.clientX - r.left) * (W / r.width),
+      y: (e.clientY - r.top) * (H / r.height)
+    };
+  });
+  cvs.addEventListener('click', e => {
+    if (!state || state.over) return;
+    const r = cvs.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (W / r.width);
+    const my = (e.clientY - r.top) * (H / r.height);
+    if (state.shopSel === 'turret') {
+      tryPlaceTurret(mx, my);
+    } else if (state.shopSel === 'turretUp') {
+      tryUpgradeTurret(mx, my);
+    } else {
+      // 点击靠近床可交互
+      // (床产出是自动的，靠近加速)
+    }
+  });
+
+  function tryPlaceTurret(mx, my) {
+    const c = COST.turret();
+    if (state.gold < c) { flash('金币不足'); return; }
+    // 必须放在墙边上
+    const pos = wallSnapPos(mx, my);
+    if (!pos) { flash('需放在墙上'); return; }
+    // 检查重叠
+    if (state.turrets.some(t => Math.hypot(t.x-pos.x, t.y-pos.y) < 30)) {
+      flash('位置太近'); return;
+    }
+    state.gold -= c;
+    state.turrets.push({
+      x: pos.x, y: pos.y, lv: 1, cool: 0,
+      range: 220, dmg: 12, fireRate: 30,
+      angle: pos.facing === 'left' ? Math.PI : 0
+    });
+    state.shopSel = null;
+    updateShopUI();
+    flash('炮台就位！');
+  }
+
+  function tryUpgradeTurret(mx, my) {
+    const t = state.turrets.find(t => Math.hypot(t.x-mx, t.y-my) < 18);
+    if (!t) { flash('请点击炮台'); return; }
+    const c = COST.turretUp(t);
+    if (state.gold < c) { flash('金币不足'); return; }
+    state.gold -= c;
+    t.lv++;
+    t.dmg += 8;
+    t.range += 30;
+    t.fireRate = Math.max(10, t.fireRate - 3);
+    flash('炮台升级 Lv.' + t.lv);
+    updateShopUI();
+  }
+
+  // 计算墙上的吸附点
+  function wallSnapPos(mx, my) {
+    const t = ROOM.wall / 2;
+    const left = ROOM.x, right = ROOM.x + ROOM.w;
+    const top = ROOM.y, bot = ROOM.y + ROOM.h;
+    // 距离哪面墙最近
+    const dl = Math.abs(mx - left);
+    const dr = Math.abs(mx - right);
+    const dt = Math.abs(my - top);
+    const db = Math.abs(my - bot);
+    const m = Math.min(dl, dr, dt, db);
+    if (m > 60) return null; // 太远
+    if (m === dl && my > top+10 && my < bot-10) {
+      return { x: left + t, y: my, facing: 'left' };
+    }
+    if (m === dr && my > top+10 && my < bot-10) {
+      // 避开门
+      if (my > ROOM.doorY - 5 && my < ROOM.doorY + ROOM.doorW + 5) return null;
+      return { x: right - t, y: my, facing: 'right' };
+    }
+    if (m === dt && mx > left+10 && mx < right-10) {
+      return { x: mx, y: top + t, facing: 'top' };
+    }
+    if (m === db && mx > left+10 && mx < right-10) {
+      return { x: mx, y: bot - t, facing: 'bottom' };
+    }
+    return null;
+  }
+
+  // ===== 游戏循环 =====
+  let last = 0;
+  function loop(ts) {
+    const dt = Math.min(2, (ts - last) / 16.67); // 标准化到 60fps 步长
+    last = ts;
+    if (state && !state.over) update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  function update(dt) {
+    state.phaseTime += dt / 60; // 秒
+
+    // 白天/夜晚转换
+    if (state.phase === 'day' && state.phaseTime >= state.dayDuration) {
+      startNight();
+    }
+    if (state.phase === 'night' && state.monsters.length === 0 && state.spawnQueue === 0) {
+      endNight();
+    }
+
+    // 玩家移动
+    const p = state.player;
+    let mvx = 0, mvy = 0;
+    if (keys['w'] || keys['arrowup']) mvy -= 1;
+    if (keys['s'] || keys['arrowdown']) mvy += 1;
+    if (keys['a'] || keys['arrowleft']) mvx -= 1;
+    if (keys['d'] || keys['arrowright']) mvx += 1;
+    if (mvx || mvy) {
+      const len = Math.hypot(mvx, mvy);
+      mvx /= len; mvy /= len;
+      p.x += mvx * p.speed * dt;
+      p.y += mvy * p.speed * dt;
+      // 限制在房间内
+      p.x = Math.max(ROOM.x + p.r + 4, Math.min(ROOM.x + ROOM.w - p.r - 4, p.x));
+      p.y = Math.max(ROOM.y + p.r + 4, Math.min(ROOM.y + ROOM.h - p.r - 4, p.y));
+    }
+
+    // 床产出金币（靠近加速）
+    const nearBed = Math.hypot(p.x - (BED.x+BED.w/2), p.y - (BED.y+BED.h/2)) < 60;
+    const rate = nearBed ? state.bed.rate * 2 : state.bed.rate;
+    state.bed.accum += rate * dt / 60;
+    while (state.bed.accum >= 1) {
+      state.gold += 1;
+      state.bed.accum -= 1;
+    }
+
+    // 炮台攻击
+    for (const t of state.turrets) {
+      t.cool -= dt;
+      if (t.cool <= 0) {
+        // 找最近的怪物（房间外）
+        let target = null, best = t.range;
+        for (const m of state.monsters) {
+          const d = Math.hypot(m.x - t.x, m.y - t.y);
+          if (d < best) { best = d; target = m; }
+        }
+        if (target) {
+          t.angle = Math.atan2(target.y - t.y, target.x - t.x);
+          state.bullets.push({
+            x: t.x, y: t.y, tx: target.x, ty: target.y,
+            target, dmg: t.dmg, speed: 8, life: 60
+          });
+          t.cool = t.fireRate;
+        }
+      }
+    }
+
+    // 子弹移动
+    for (const b of state.bullets) {
+      if (b.target && b.target.hp > 0) {
+        b.tx = b.target.x; b.ty = b.target.y;
+      }
+      const dx = b.tx - b.x, dy = b.ty - b.y;
+      const d = Math.hypot(dx, dy);
+      if (d < b.speed * dt + 4) {
+        // 命中
+        if (b.target && b.target.hp > 0) {
+          damageMonster(b.target, b.dmg);
+        }
+        b.dead = true;
+      } else {
+        b.x += dx / d * b.speed * dt;
+        b.y += dy / d * b.speed * dt;
+      }
+      b.life -= dt;
+      if (b.life <= 0) b.dead = true;
+    }
+    state.bullets = state.bullets.filter(b => !b.dead);
+
+    // 怪物生成
+    if (state.phase === 'night' && state.spawnQueue > 0) {
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0) {
+        spawnMonster();
+        state.spawnQueue--;
+        state.spawnTimer = 60 + Math.random() * 60;
+      }
+    }
+
+    // 怪物 AI
+    for (const m of state.monsters) {
+      m.atkCool -= dt;
+      let tx, ty;
+      if (m.inside) {
+        // 已进入房间，攻击床或玩家
+        // 优先攻击玩家
+        tx = state.player.x; ty = state.player.y;
+        const dp = Math.hypot(tx - m.x, ty - m.y);
+        if (dp < m.r + state.player.r) {
+          if (m.atkCool <= 0) {
+            state.player.hp -= m.dmg;
+            m.atkCool = 60;
+            spawnParticles(state.player.x, state.player.y, '#ff5a7a', 6);
+            if (state.player.hp <= 0) gameOver();
+          }
+        } else {
+          moveToward(m, tx, ty, dt);
+        }
+      } else {
+        // 朝门移动
+        tx = ROOM.x + ROOM.w; ty = ROOM.doorY + ROOM.doorW/2;
+        const dx = tx - m.x, dy = ty - m.y;
+        const d = Math.hypot(dx, dy);
+        if (d < 4) {
+          // 到达门，开始攻击门
+          if (m.atkCool <= 0) {
+            state.door.hp -= m.dmg;
+            m.atkCool = 50;
+            spawnParticles(ROOM.x + ROOM.w, ty, '#ffa040', 5);
+            if (state.door.hp <= 0) {
+              state.door.hp = 0;
+              m.inside = true;
+              // 进门后位置
+              m.x = ROOM.x + ROOM.w - 20;
+              m.y = ty;
+            }
+          }
+        } else {
+          moveToward(m, tx, ty, dt);
+        }
+      }
+    }
+    // 清理死亡怪物
+    state.monsters = state.monsters.filter(m => {
+      if (m.hp <= 0) {
+        state.gold += m.reward;
+        spawnParticles(m.x, m.y, '#9d6bff', 12);
+        return false;
+      }
+      return true;
+    });
+
+    // 粒子
+    for (const pt of state.particles) {
+      if (pt.type === 'text') {
+        pt.y += pt.vy * dt;
+        pt.life -= dt;
+      } else {
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+        pt.vy += 0.1 * dt;
+        pt.life -= dt;
+      }
+    }
+    state.particles = state.particles.filter(p => p.life > 0);
+
+    // 公告计时
+    if (state.announceTimer > 0) state.announceTimer -= dt;
+
+    updateHUD();
+  }
+
+  function moveToward(m, tx, ty, dt) {
+    const dx = tx - m.x, dy = ty - m.y;
+    const d = Math.hypot(dx, dy) || 1;
+    m.x += dx / d * m.speed * dt;
+    m.y += dy / d * m.speed * dt;
+  }
+
+  function spawnMonster() {
+    const w = state.wave;
+    // 从右侧屏幕外生成
+    const side = Math.random();
+    let x, y;
+    if (side < 0.5) {
+      x = W + 20;
+      y = ROOM.doorY + Math.random() * ROOM.doorW;
+    } else if (side < 0.75) {
+      x = ROOM.x + ROOM.w + 40 + Math.random()*80;
+      y = -20;
+    } else {
+      x = ROOM.x + ROOM.w + 40 + Math.random()*80;
+      y = H + 20;
+    }
+    const baseHp = 30 + w * 15;
+    state.monsters.push({
+      x, y, r: 13,
+      hp: baseHp, maxHp: baseHp,
+      speed: 0.7 + Math.random()*0.3 + w*0.04,
+      dmg: 8 + w * 2,
+      reward: 5 + Math.floor(w * 1.5),
+      atkCool: 0,
+      inside: false,
+      wob: Math.random() * Math.PI * 2,
+      type: Math.random() < 0.15 ? 'big' : 'normal'
+    });
+    if (Math.random() < 0.15) {
+      const m = state.monsters[state.monsters.length-1];
+      m.type = 'big';
+      m.r = 18; m.hp = baseHp * 2.5; m.maxHp = m.hp;
+      m.speed *= 0.6; m.dmg += 6; m.reward += 10;
+    }
+  }
+
+  function damageMonster(m, dmg) {
+    m.hp -= dmg;
+    m.flash = 8;
+  }
+
+  function spawnParticles(x, y, color, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 1 + Math.random() * 3;
+      state.particles.push({
+        type: 'spark', x, y,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1,
+        life: 30 + Math.random()*20, color, r: 2 + Math.random()*2
+      });
+    }
+  }
+
+  // ===== 白天/夜晚 =====
+  function startNight() {
+    state.phase = 'night';
+    state.phaseTime = 0;
+    state.wave++;
+    state.spawnQueue = 2 + state.wave * 2;
+    state.spawnTimer = 30;
+    announce('第 ' + state.wave + ' 波', '夜晚降临！');
+  }
+
+  function endNight() {
+    state.phase = 'day';
+    state.phaseTime = 0;
+    state.dayDuration = Math.max(10, 14 - state.wave * 0.5);
+    state.gold += 10 + state.wave * 3; // 夜晚结算奖励
+    announce('白天来了', '+' + (10 + state.wave * 3) + ' 结算金币');
+  }
+
+  function announce(big, small) {
+    const el = document.getElementById('wave-announce');
+    el.innerHTML = big + (small ? '<small>' + small + '</small>' : '');
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 1800);
+  }
+
+  function gameOver() {
+    state.over = true;
+    const ov = document.getElementById('overlay');
+    ov.innerHTML = '<h1>游戏结束</h1>' +
+      '<p>你撑到了第 <b style="color:#ffd24a">' + state.wave + '</b> 波</p>' +
+      '<p>累计金币 <b style="color:#ffd24a">' + state.gold + '</b></p>' +
+      '<button id="restart">再来一局</button>';
+    document.getElementById('stage').classList.add('gameover');
+    ov.classList.remove('hidden');
+    document.getElementById('restart').addEventListener('click', restart);
+  }
+
+  function restart() {
+    state = newState();
+    document.getElementById('stage').classList.remove('gameover');
+    document.getElementById('overlay').classList.add('hidden');
+    updateShopUI();
+    announce('第 1 天', '白天发育！');
+    state.dayDuration = 16;
+  }
+
+  // ===== UI 更新 =====
+  function updateHUD() {
+    document.getElementById('gold').textContent = Math.floor(state.gold);
+    document.getElementById('wave').textContent = state.wave;
+    document.getElementById('hp').textContent = Math.max(0, Math.floor(state.player.hp));
+    document.getElementById('doorHp').textContent = Math.max(0, Math.floor(state.door.hp));
+    document.getElementById('phase').textContent = state.phase === 'day' ? '☀ 白天' : '🌙 夜晚';
+    document.getElementById('phase').style.color = state.phase === 'day' ? '#ffd24a' : '#9d6bff';
+    updateShopUI();
+  }
+
+  function updateShopUI() {
+    if (!state) return;
+    const btns = document.querySelectorAll('.shop-btn');
+    const data = {
+      bed: { cost: COST.bed(state), lv: state.bed.lv, rate: state.bed.rate },
+      door: { cost: COST.door(state), rate: state.door.maxHp },
+      repair: { cost: COST.repair() },
+      turret: { cost: COST.turret() },
+      turretUp: { cost: 30 },
+    };
+    btns.forEach(btn => {
+      const a = btn.dataset.action;
+      const d = data[a];
+      const priceEl = btn.querySelector('.price');
+      if (priceEl) priceEl.textContent = d.cost;
+      btn.disabled = state.gold < d.cost;
+      btn.classList.toggle('active', state.shopSel === a);
+      if (a === 'bed') {
+        btn.querySelector('[data-lv="bed"]').textContent = d.lv;
+        btn.querySelector('[data-rate="bed"]').textContent = d.rate;
+      }
+      if (a === 'door') {
+        btn.querySelector('[data-rate="door"]').textContent = d.rate;
+      }
+    });
+  }
+
+  // ===== 渲染 =====
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    if (!state) return;
+
+    // 背景渐变（昼夜）
+    const isNight = state.phase === 'night';
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    if (isNight) {
+      g.addColorStop(0, '#0a0d1f');
+      g.addColorStop(1, '#150a1f');
+    } else {
+      g.addColorStop(0, '#1a2a3a');
+      g.addColorStop(1, '#0d1a2a');
+    }
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // 远处装饰光点
+    drawStars(isNight);
+
+    // 地面（房间区域）
+    ctx.fillStyle = isNight ? '#2a2415' : '#3a3220';
+    ctx.fillRect(ROOM.x, ROOM.y, ROOM.w, ROOM.h);
+    // 地砖纹理
+    ctx.strokeStyle = isNight ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 6; i++) {
+      ctx.beginPath();
+      ctx.moveTo(ROOM.x, ROOM.y + i * ROOM.h/6);
+      ctx.lineTo(ROOM.x + ROOM.w, ROOM.y + i * ROOM.h/6);
+      ctx.stroke();
+    }
+    for (let i = 1; i < 5; i++) {
+      ctx.beginPath();
+      ctx.moveTo(ROOM.x + i * ROOM.w/5, ROOM.y);
+      ctx.lineTo(ROOM.x + i * ROOM.w/5, ROOM.y + ROOM.h);
+      ctx.stroke();
+    }
+
+    // 墙体
+    ctx.fillStyle = isNight ? '#1a1f3a' : '#2a3050';
+    // 上墙
+    ctx.fillRect(ROOM.x - ROOM.wall, ROOM.y - ROOM.wall, ROOM.w + ROOM.wall*2, ROOM.wall);
+    // 下墙
+    ctx.fillRect(ROOM.x - ROOM.wall, ROOM.y + ROOM.h, ROOM.w + ROOM.wall*2, ROOM.wall);
+    // 左墙
+    ctx.fillRect(ROOM.x - ROOM.wall, ROOM.y, ROOM.wall, ROOM.h);
+    // 右墙（带门缺口）
+    ctx.fillRect(ROOM.x + ROOM.w, ROOM.y, ROOM.wall, ROOM.doorY - ROOM.y);
+    ctx.fillRect(ROOM.x + ROOM.w, ROOM.doorY + ROOM.doorW, ROOM.wall, ROOM.y + ROOM.h - (ROOM.doorY + ROOM.doorW));
+
+    // 门
+    drawDoor();
+
+    // 床
+    drawBed();
+
+    // 玩家
+    drawPlayer();
+
+    // 炮台
+    for (const t of state.turrets) drawTurret(t);
+
+    // 怪物
+    for (const m of state.monsters) drawMonster(m);
+
+    // 子弹
+    for (const b of state.bullets) drawBullet(b);
+
+    // 粒子
+    for (const p of state.particles) drawParticle(p);
+
+    // 放置炮台预览
+    if (state.shopSel === 'turret' && state.mouse) {
+      const pos = wallSnapPos(state.mouse.x, state.mouse.y);
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      if (pos) {
+        drawTurret({ x: pos.x, y: pos.y, lv: 1, angle: 0, range: 220, cool: 0 });
+        ctx.strokeStyle = '#4affc8';
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 220, 0, Math.PI*2);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = '#ff5a7a';
+        ctx.beginPath();
+        ctx.arc(state.mouse.x, state.mouse.y, 10, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // 升级模式提示
+    if (state.shopSel === 'turretUp') {
+      for (const t of state.turrets) {
+        ctx.save();
+        ctx.strokeStyle = '#ffd24a';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, 22, 0, Math.PI*2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    // 夜晚黑暗遮罩
+    if (isNight) {
+      ctx.fillStyle = 'rgba(0,0,30,0.25)';
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  function drawStars(isNight) {
+    if (!isNight) return;
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < 40; i++) {
+      const x = (i * 73 + 31) % W;
+      const y = (i * 41 + 17) % (H * 0.5);
+      ctx.globalAlpha = 0.3 + (Math.sin(performance.now()/500 + i) * 0.3 + 0.3);
+      ctx.fillRect(x, y, 1.5, 1.5);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawDoor() {
+    const x = ROOM.x + ROOM.w;
+    const y = ROOM.doorY;
+    const w = ROOM.wall;
+    const h = ROOM.doorW;
+    const ratio = state.door.hp / state.door.maxHp;
+    // 门框
+    ctx.fillStyle = '#3a2a10';
+    ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+    // 门板（颜色随血量变化）
+    const r = Math.floor(200 - 100 * (1-ratio));
+    const gcol = Math.floor(140 * ratio);
+    ctx.fillStyle = `rgb(${r+50},${gcol+40},20)`;
+    ctx.fillRect(x, y, w, h);
+    // 木纹
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    for (let i = 1; i < 4; i++) {
+      ctx.beginPath();
+      ctx.moveTo(x, y + i*h/4);
+      ctx.lineTo(x + w, y + i*h/4);
+      ctx.stroke();
+    }
+    // 血条
+    if (state.door.hp < state.door.maxHp) {
+      ctx.fillStyle = 'rgba(0,0,0,0.6)';
+      ctx.fillRect(x - 8, y + h/2 - 4, 4, h);
+      ctx.fillStyle = ratio > 0.5 ? '#4affc8' : ratio > 0.25 ? '#ffd24a' : '#ff5a7a';
+      ctx.fillRect(x - 8, y + h/2 - 4 + h*(1-ratio)/2, 4, h*ratio);
+    }
+  }
+
+  function drawBed() {
+    const x = BED.x, y = BED.y, w = BED.w, h = BED.h;
+    // 床架
+    ctx.fillStyle = '#5a3a5a';
+    ctx.fillRect(x, y, w, h);
+    // 床头
+    ctx.fillStyle = '#3a2a3a';
+    ctx.fillRect(x, y, w, 12);
+    // 被子
+    ctx.fillStyle = '#a04060';
+    ctx.fillRect(x + 4, y + 16, w - 8, h - 24);
+    // 枕头
+    ctx.fillStyle = '#e8d8d0';
+    ctx.fillRect(x + 8, y + 18, w - 16, 14);
+    // 等级标志
+    ctx.fillStyle = '#ffd24a';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Lv.' + state.bed.lv, x + w/2, y + h + 14);
+    // 产出光环
+    ctx.strokeStyle = 'rgba(255,210,74,0.3)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x + w/2, y + h/2, 40 + Math.sin(performance.now()/300)*3, 0, Math.PI*2);
+    ctx.stroke();
+  }
+
+  function drawPlayer() {
+    const p = state.player;
+    // 阴影
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + p.r + 2, p.r*0.8, p.r*0.3, 0, 0, Math.PI*2);
+    ctx.fill();
+    // 身体
+    ctx.fillStyle = '#e8e8e8';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+    ctx.fill();
+    // 眼睛
+    ctx.fillStyle = '#1a1a3a';
+    ctx.beginPath();
+    ctx.arc(p.x - 4, p.y - 2, 2, 0, Math.PI*2);
+    ctx.arc(p.x + 4, p.y - 2, 2, 0, Math.PI*2);
+    ctx.fill();
+    // 嘴
+    ctx.strokeStyle = '#1a1a3a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y + 2, 3, 0, Math.PI);
+    ctx.stroke();
+    // 血条
+    if (state.player.hp < state.player.maxHp) {
+      drawBar(p.x - 16, p.y - p.r - 8, 32, 4, state.player.hp / state.player.maxHp, '#ff5a7a');
+    }
+  }
+
+  function drawTurret(t) {
+    // 基座
+    ctx.fillStyle = '#2a3a4a';
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 10, 0, Math.PI*2);
+    ctx.fill();
+    ctx.strokeStyle = '#4affc8';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // 炮管
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    ctx.rotate(t.angle);
+    ctx.fillStyle = '#5affd8';
+    ctx.fillRect(0, -3, 14 + t.lv*2, 6);
+    ctx.restore();
+    // 等级
+    ctx.fillStyle = '#ffd24a';
+    ctx.font = 'bold 9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(t.lv, t.x, t.y + 3);
+  }
+
+  function drawMonster(m) {
+    m.wob += 0.1;
+    const wob = Math.sin(m.wob) * 2;
+    // 阴影
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(m.x, m.y + m.r + 2, m.r*0.8, m.r*0.3, 0, 0, Math.PI*2);
+    ctx.fill();
+    // 身体
+    const col = m.flash > 0 ? '#ffffff' : (m.type === 'big' ? '#7a3aaf' : '#5a2a7a');
+    if (m.flash > 0) m.flash--;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y + wob*0.3, m.r, 0, Math.PI*2);
+    ctx.fill();
+    // 眼睛（红色）
+    ctx.fillStyle = '#ff3030';
+    ctx.beginPath();
+    ctx.arc(m.x - m.r*0.3, m.y - m.r*0.2 + wob*0.3, 2.5, 0, Math.PI*2);
+    ctx.arc(m.x + m.r*0.3, m.y - m.r*0.2 + wob*0.3, 2.5, 0, Math.PI*2);
+    ctx.fill();
+    // 嘴
+    ctx.strokeStyle = '#ff3030';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(m.x, m.y + m.r*0.3 + wob*0.3, m.r*0.4, 0, Math.PI);
+    ctx.stroke();
+    // 牙
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(m.x - 3, m.y + m.r*0.3 + wob*0.3, 2, 3);
+    ctx.fillRect(m.x + 1, m.y + m.r*0.3 + wob*0.3, 2, 3);
+    // 血条
+    if (m.hp < m.maxHp) {
+      drawBar(m.x - m.r, m.y - m.r - 6, m.r*2, 3, m.hp/m.maxHp, '#ff5a7a');
+    }
+  }
+
+  function drawBullet(b) {
+    ctx.strokeStyle = 'rgba(74,255,200,0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    const dx = b.tx - b.x, dy = b.ty - b.y;
+    const d = Math.hypot(dx, dy) || 1;
+    ctx.lineTo(b.x - dx/d*8, b.y - dy/d*8);
+    ctx.stroke();
+    ctx.fillStyle = '#4affc8';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 3, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  function drawParticle(p) {
+    if (p.type === 'text') {
+      ctx.globalAlpha = Math.min(1, p.life / 30);
+      ctx.fillStyle = p.color;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.text, p.x, p.y);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.globalAlpha = Math.min(1, p.life / 30);
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawBar(x, y, w, h, ratio, color) {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w * ratio, h);
+  }
+
+  // ===== 启动 =====
+  document.getElementById('startBtn').addEventListener('click', () => {
+    restart();
+    document.getElementById('overlay').classList.add('hidden');
+  });
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
